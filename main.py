@@ -16,10 +16,6 @@ if __name__ == "__main__":
         level=logging.INFO,
         stream=sys.stdout
                         )
-    headers = {'Authorization': 'bearer {}'.format(
-        os.getenv('STRAPI_PRODUCT_TOKEN')
-    )
-    }
 
     storage = RedisStorage.from_url(os.getenv('REDIS_URL'))
     bot = Bot(os.getenv('TG_BOT_TOKEN'))
