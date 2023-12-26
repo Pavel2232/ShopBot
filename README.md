@@ -7,7 +7,8 @@ Telegram-магазин мечты!
 
 ## Как запустить?
 - Склонируйте репозиторий ``` git clone https://github.com/Pavel2232/ShopBot```
-- Установите зависимости проекта ```poetry init```
+- Активируйте виртуальное окружение ```poetry init```
+- Установите зависимости проекта ```poetry install```
 - Заполните .env 
 ```dotenv
 TG_BOT_TOKEN=Получаете token у BotFather
