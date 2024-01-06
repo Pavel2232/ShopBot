@@ -6,7 +6,6 @@ from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery, BufferedInputFile
-from dotenv import load_dotenv
 from pydantic import validate_email
 from pydantic_core import PydanticCustomError
 
@@ -38,12 +37,21 @@ class UserShopping(StatesGroup):
 
 @shop.message(CommandStart())
 async def start_shopping(message: Message, state: FSMContext) -> None:
+
+    strapi = Strapi(token=os.getenv('STRAPI_PRODUCT_TOKEN'),
+                    api_url=os.getenv('API_STRAPI_URL'),
+                    endpoints='products',
+                    )
+
+    products = await strapi.get_product_all()
+    await strapi.close_session()
     await set_commands(message.bot)
     await state.set_state(UserShopping.start)
     await message.answer(
         'Пожалуйста выберите:', reply_markup=await create_catalog_inlines(
             id_user=message.from_user.id,
-            end_page=int(os.getenv('PAGINATION'))
+            end_page=int(os.getenv('PAGINATION')),
+            products=products,
         ))
 
 
@@ -269,13 +277,22 @@ async def pagination_page(call: CallbackQuery,
 
 @shop.callback_query(BackCallback.filter())
 async def back_menu(call: CallbackQuery, state: FSMContext):
+
+    strapi = Strapi(token=os.getenv('STRAPI_PRODUCT_TOKEN'),
+                    api_url=os.getenv('API_STRAPI_URL'),
+                    endpoints='products',
+                    )
+
+    products = await strapi.get_product_all()
+    await strapi.close_session()
+
     await call.message.edit_reply_markup(
         reply_markup=await create_catalog_inlines(
             id_user=call.from_user.id,
             current_page=1,
             start_page=0,
-            end_page=int(os.getenv('PAGINATION')
-                         )
+            end_page=int(os.getenv('PAGINATION')),
+            products=products
         )
     )
 
