@@ -1,14 +1,14 @@
 import os
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from callbackdata_class.callback_class import ProductCallback, BackCallback, AddToShoppingCartCallback, \
+from callbackdata_factory.callbacks import ProductCallback, BackCallback, AddToShoppingCartCallback, \
     RemoveProductCartCallback, MyShoppingCartCallback, PayCallback, PaginatorCallback
-from strapi_class_api import Strapi
-from strapi_dataclasses import ShoppingCartStrapiModelList
+from strapi import Strapi
+from strapi_model import ShoppingCartStrapiModelList
 
 
-async def create_catalog_inlines(id_user: int, start_page: int, end_page: int,
-                                 current_page: int) -> InlineKeyboardMarkup:
+async def create_catalog_inlines(id_user: int, end_page: int,
+                                 current_page: int = 1, start_page: int = 0) -> InlineKeyboardMarkup:
     markup = InlineKeyboardBuilder()
     pagination_markup = InlineKeyboardBuilder()
 
@@ -17,7 +17,7 @@ async def create_catalog_inlines(id_user: int, start_page: int, end_page: int,
                     endpoints='products',
                     )
 
-    products = await strapi.async_get_product_all()
+    products = await strapi.get_product_all()
 
     last_page = len(products.data) // int(os.getenv('PAGINATION')) + 1
 
@@ -25,6 +25,7 @@ async def create_catalog_inlines(id_user: int, start_page: int, end_page: int,
         markup.button(text='{}'.format(product.attributes.title),
                       callback_data=ProductCallback(id=product.id))
 
+    await strapi.close_session()
     markup.button(
         text='Моя корзина 🛍️',
         callback_data=MyShoppingCartCallback(

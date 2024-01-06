@@ -5,7 +5,7 @@ import sys
 from aiogram import Dispatcher, Bot
 from aiogram.fsm.storage.redis import RedisStorage
 from dotenv import load_dotenv
-from handlers.start import shop
+from handlers.shop import shop
 
 
 if __name__ == "__main__":
