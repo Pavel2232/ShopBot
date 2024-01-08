@@ -1,7 +1,4 @@
-import os
-
 from aiogram.client.session import aiohttp
-
 from strapi_model import (
     ProductStrapiModelList,
     ProductStrapiModel, ShoppingCartStrapiModel,
@@ -26,7 +23,17 @@ class Strapi:
         self._api_url = api_url
         self._endpoints = endpoints
         self._endpoint = self._endpoints[:-1]
+        self._session = None
+
+    async def __aenter__(self):
+        """Create session"""
         self._session = aiohttp.ClientSession(raise_for_status=True)
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Exit session"""
+        await self._session.close()
+        self._session = None
 
     async def get_product_all(self) -> ProductStrapiModelList:
         """Receives API request data, returns class StrapiModelList."""
@@ -128,7 +135,7 @@ class Strapi:
             name_relation: str, data_relation: dict,
             field_relation: str) -> None:
         """
-        creates a main model with related models
+        creates a cart model with product-quantity models
 
         :param product_id: product id by database
         :param user_id: telegram id user
@@ -163,7 +170,7 @@ class Strapi:
             quantity_product_id=product_quantity_id,
             name_relation=name_relation,
             data_relation=data_relation
-                                         )
+        )
 
     async def deleted_product(self, id_object: int) -> None:
         """
@@ -242,7 +249,7 @@ class Strapi:
 
     async def _get_or_create_cart(
             self, field_relation: str, user_id: int, data_model: dict) -> int:
-
+        """Create or get cart id"""
         payload = {
             f'populate[{field_relation}][populate][0]': 'product',
             'filters[id_tg][$eq]': user_id,
@@ -272,7 +279,7 @@ class Strapi:
             data_model: dict,
             data_relation: dict,
             product_id: int) -> int:
-
+        """Create or get quantity-product id"""
         payload = {
             'populate[product][populate][0]': 'id',
             f'filters[{self._endpoint}][id][$eq]': shop_cart_id}
@@ -328,6 +335,7 @@ class Strapi:
 
     async def _put_product_quantity(self, quantity_product_id: int,
                                     name_relation: str, data_relation: dict):
+        """Update quantity-product model"""
         await self._session.put(
             url='{api_url}{relation_endpoints}/{id}'.format(
                 api_url=self._api_url,
@@ -336,7 +344,3 @@ class Strapi:
             ),
             headers=self._headers,
             json=data_relation)
-
-    async def close_session(self):
-        await self._session.close()
-

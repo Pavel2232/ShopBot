@@ -25,7 +25,6 @@ async def create_catalog_inlines(
         markup.button(text='{}'.format(product.attributes.title),
                       callback_data=ProductCallback(id=product.id))
 
-
     markup.button(
         text='Моя корзина 🛍️',
         callback_data=MyShoppingCartCallback(
