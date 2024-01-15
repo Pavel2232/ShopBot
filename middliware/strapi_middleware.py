@@ -14,14 +14,9 @@ class StrapiCartsMiddleware(BaseMiddleware):
             data: Dict[str, Any]
     ) -> Any:
 
-        data['shop_carts'] = Strapi(
+        data['strapi'] = Strapi(
             token=os.getenv('STRAPI_PRODUCT_TOKEN'),
-            api_url=os.getenv('API_STRAPI_URL'),
-            endpoints='carts')
-
-        data['products'] = Strapi(
-            token=os.getenv('STRAPI_PRODUCT_TOKEN'),
-            api_url=os.getenv('API_STRAPI_URL'),
-            endpoints='products')
+            api_url=os.getenv('API_STRAPI_URL')
+        )
 
         return await handler(event, data)

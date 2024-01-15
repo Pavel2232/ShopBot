@@ -37,9 +37,9 @@ class UserShopping(StatesGroup):
 
 @shop.message(CommandStart())
 async def start_shopping(message: Message, state: FSMContext,
-                         products: Strapi) -> None:
-    async with products:
-        products = await products.get_product_all()
+                         strapi: Strapi) -> None:
+    async with strapi:
+        products = await strapi.get_product_all()
 
         await set_commands(message.bot)
         await state.set_state(UserShopping.start)
@@ -55,12 +55,12 @@ async def start_shopping(message: Message, state: FSMContext,
 async def detail_product(call: CallbackQuery,
                          callback_data: ProductCallback,
                          state: FSMContext,
-                         products: Strapi):
-    async with products:
-        product = await products.get_product_by_id(callback_data.id)
+                         strapi: Strapi):
+    async with strapi:
+        product = await strapi.get_product_by_id(callback_data.id)
 
         await call.message.answer_photo(BufferedInputFile(
-            await products.get_photo_bytes(callback_data.id),
+            await strapi.get_photo_bytes(callback_data.id),
             filename='{}.jpeg'.format(product.data.attributes.title)),
             caption=textwrap.dedent('''{title}  - {price}руб.
     {description}
@@ -77,9 +77,9 @@ async def detail_product(call: CallbackQuery,
 @shop.callback_query(AddToShoppingCartCallback.filter())
 async def add_shopping_cart(call: CallbackQuery,
                             callback_data: AddToShoppingCartCallback,
-                            shop_carts: Strapi):
-    async with shop_carts:
-        await shop_carts.create_user_cart(
+                            strapi: Strapi):
+    async with strapi:
+        await strapi.create_user_cart(
             product_id=callback_data.id_product,
             user_id=call.from_user.id,
             data_model={
@@ -87,8 +87,6 @@ async def add_shopping_cart(call: CallbackQuery,
                     'id_tg': call.from_user.id,
                 }
             },
-            name_relation='quantity-products',
-            field_relation='quantity_products',
             data_relation={'data': {
                 'product': callback_data.id_product,
                 'quantity': 1,
@@ -105,9 +103,9 @@ async def add_shopping_cart(call: CallbackQuery,
 async def get_my_shopping_cart(call: CallbackQuery,
                                callback_data: MyShoppingCartCallback,
                                state: FSMContext,
-                               shop_carts: Strapi):
-    async with shop_carts:
-        all_products = await shop_carts.get_cart_by_filter(
+                               strapi: Strapi):
+    async with strapi:
+        all_products = await strapi.get_cart_by_filter(
             filter=str(callback_data.id_user),
             filter_field='id_tg')
         products = []
@@ -156,15 +154,11 @@ async def remove_product_shopping_cart(
         call: CallbackQuery,
         callback_data: RemoveProductCartCallback,
         state: FSMContext,
-        shop_carts: Strapi):
-    quantity_products = Strapi(
-        token=os.getenv('STRAPI_PRODUCT_TOKEN'),
-        api_url=os.getenv('API_STRAPI_URL'),
-        endpoints='quantity-products')
+        strapi: Strapi):
 
-    async with quantity_products:
+    async with strapi:
 
-        await quantity_products.deleted_product(
+        await strapi.deleted_product(
             callback_data.remove_id_quantity_product
         )
 
@@ -173,7 +167,7 @@ async def remove_product_shopping_cart(
                                    MyShoppingCartCallback(
                                        id_user=call.from_user.id
                                    ),
-                                   shop_carts=shop_carts,
+                                   strapi=strapi,
                                    state=state)
         # await shop_cart.close_session()
 
@@ -205,20 +199,19 @@ async def get_email(message: Message, state: FSMContext):
 
 @shop.message(UserShopping.confirm_email)
 async def check_email_finish_step(message: Message, state: FSMContext,
-                                  shop_carts: Strapi,
-                                  products: Strapi):
+                                  strapi: Strapi):
     data_order = await state.get_data()
 
     if message.text == 'Да':
-        async with shop_carts:
-            await shop_carts.unpublished_cart(data_order.get('id_cart'))
+        async with strapi:
+            await strapi.unpublished_cart(data_order.get('id_cart'))
         await state.clear()
         await state.set_state(UserShopping.start)
 
         await message.answer('''
 Спасибо за заказ!
 Ожидайте подтверждения по почте!''')
-        await start_shopping(message, state, products)
+        await start_shopping(message, state, strapi)
     else:
         await message.answer('Введите вашу почту')
         await state.set_state(UserShopping.waiting_email)
@@ -227,7 +220,7 @@ async def check_email_finish_step(message: Message, state: FSMContext,
 @shop.callback_query(PaginatorCallback.filter())
 async def pagination_page(call: CallbackQuery,
                           callback_data: PaginatorCallback,
-                          products: Strapi):
+                          strapi: Strapi):
     start = callback_data.start_page
     end = callback_data.end_page
     current_page = callback_data.current_page
@@ -254,8 +247,8 @@ async def pagination_page(call: CallbackQuery,
             await call.answer('Вы в начале')
 
     try:
-        async with products:
-            products = await products.get_product_all()
+        async with strapi:
+            products = await strapi.get_product_all()
             await call.message.edit_reply_markup(
                 reply_markup=await create_catalog_inlines(
                     id_user=call.from_user.id,
@@ -269,9 +262,9 @@ async def pagination_page(call: CallbackQuery,
 
 @shop.callback_query(BackCallback.filter())
 async def back_menu(call: CallbackQuery, state: FSMContext,
-                    products: Strapi):
-    async with products:
-        products = await products.get_product_all()
+                    strapi: Strapi):
+    async with strapi:
+        products = await strapi.get_product_all()
 
         await call.message.edit_reply_markup(
             reply_markup=await create_catalog_inlines(

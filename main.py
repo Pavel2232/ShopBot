@@ -22,11 +22,6 @@ if __name__ == "__main__":
     bot = Bot(os.getenv('TG_BOT_TOKEN'))
     dp = Dispatcher(storage=storage)
 
-    strapi_carts = Strapi(
-        token=os.getenv('STRAPI_PRODUCT_TOKEN'),
-        api_url=os.getenv('API_STRAPI_URL'),
-        endpoints='carts')
-
     dp.include_router(shop)
     dp.update.middleware.register(StrapiCartsMiddleware())
 

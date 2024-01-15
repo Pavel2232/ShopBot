@@ -6,42 +6,47 @@ from strapi_model import (
     QuantityProductsModel, ShoppingCartStrapiModelList)
 
 
-class Strapi:
+class BaseSingleton(type):
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            instance = super().__call__(*args, **kwargs)
+            cls._instances[cls] = instance
+        return cls._instances[cls]
+
+
+class Strapi(metaclass=BaseSingleton):
 
     def __init__(self,
                  token: str,
-                 endpoints: str,
                  api_url='http://localhost:1337/api/') -> None:
         """
         :param token: secret token from strapi settings
         :param api_url:
          default 'http://localhost:1337/api/' for dev environments
-        :type int
-        :param endpoints:
         """
         self._headers = {'Authorization': 'bearer {}'.format(token)}
         self._api_url = api_url
-        self._endpoints = endpoints
-        self._endpoint = self._endpoints[:-1]
-        self._session = None
+        self._session = aiohttp.ClientSession(raise_for_status=True)
 
     async def __aenter__(self):
         """Create session"""
-        self._session = aiohttp.ClientSession(raise_for_status=True)
-        return self
+        if self._session.closed:
+            self._session = aiohttp.ClientSession(raise_for_status=True)
+        return self._session
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Exit session"""
         await self._session.close()
-        self._session = None
+
 
     async def get_product_all(self) -> ProductStrapiModelList:
         """Receives API request data, returns class StrapiModelList."""
 
         async with self._session.get(
-                url='{api_url}{endpoints}'.format(
-                    api_url=self._api_url,
-                    endpoints=self._endpoints),
+                url='{api_url}products'.format(
+                    api_url=self._api_url),
                 headers=self._headers) as response:
             list_object = await response.json()
             product_strapi = ProductStrapiModelList(**list_object)
@@ -58,9 +63,8 @@ class Strapi:
             'populate': '*'
         }
         response = await self._session.get(
-            url='{api_url}{endpoints}/{id}'.format(
+            url='{api_url}products/{id}'.format(
                 api_url=self._api_url,
-                endpoints=self._endpoints,
                 id=id_objects),
             headers=self._headers,
             params=payload)
@@ -79,9 +83,8 @@ class Strapi:
             'populate[quantity_products][populate][0]': 'product'
         }
         response = await self._session.get(
-            url='{api_url}{endpoints}/{id}'.format(
+            url='{api_url}carts/{id}'.format(
                 api_url=self._api_url,
-                endpoints=self._endpoints,
                 id=id_objects),
             headers=self._headers,
             params=payload)
@@ -104,9 +107,9 @@ class Strapi:
             f'filters[{filter_field}][$eq]': filter
         }
         response = await self._session.get(
-            url='{api_url}{endpoints}'.format(
+            url='{api_url}carts'.format(
                 api_url=self._api_url,
-                endpoints=self._endpoints, ),
+            ),
             headers=self._headers,
             params=payload)
         cart = await response.json()
@@ -132,8 +135,8 @@ class Strapi:
     async def create_user_cart(
             self, product_id: int,
             user_id: int, data_model: dict,
-            name_relation: str, data_relation: dict,
-            field_relation: str) -> None:
+            data_relation: dict,
+            ) -> None:
         """
         creates a cart model with product-quantity models
 
@@ -144,23 +147,19 @@ class Strapi:
                 'field_model': values,
             }
         }
-        :param name_relation: field linked with your main model
         :param data_relation: data formats json {
         'data': {
             'your_field': value,
         }
-        :param field_relation: name of the associated field
         :return: None
         """
 
-        cart_id = await self._get_or_create_cart(field_relation=field_relation,
+        cart_id = await self._get_or_create_cart(
                                                  user_id=user_id,
                                                  data_model=data_model)
 
         product_quantity_id = await self._get_or_create_quantity_product(
             shop_cart_id=cart_id,
-            name_relation=name_relation,
-            field_relation=field_relation,
             data_model=data_model,
             data_relation=data_relation,
             product_id=product_id
@@ -168,7 +167,6 @@ class Strapi:
 
         await self._put_product_quantity(
             quantity_product_id=product_quantity_id,
-            name_relation=name_relation,
             data_relation=data_relation
         )
 
@@ -179,9 +177,8 @@ class Strapi:
         :return: None
         """
         await self._session.delete(
-            url='{api_url}{endpoints}/{id}'.format(
+            url='{api_url}quantity-products/{id}'.format(
                 api_url=self._api_url,
-                endpoints=self._endpoints,
                 id=id_object),
             headers=self._headers)
 
@@ -198,9 +195,8 @@ class Strapi:
         payload = {'filters[email][$eq]': email}
 
         order_response = await self._session.get(
-            url='{api_url}{endpoints}'.format(
+            url='{api_url}carts'.format(
                 api_url=self._api_url,
-                endpoints=self._endpoints,
             ),
             headers=self._headers,
             params=payload)
@@ -215,9 +211,8 @@ class Strapi:
             }
         }
         await self._session.post(
-            url='{api_url}{endpoints}'.format(
+            url='{api_url}carts'.format(
                 api_url=self._api_url,
-                endpoints=self._endpoints,
             ),
             headers=self._headers,
             json=data_order)
@@ -239,34 +234,32 @@ class Strapi:
         payload = {'populate': '*'}
 
         await self._session.put(
-            url='{api_url}{endpoints}/{id}'.format(
+            url='{api_url}carts/{id}'.format(
                 api_url=self._api_url,
-                endpoints=self._endpoints,
                 id=id_cart),
             headers=self._headers,
             json=data_cart,
             params=payload)
 
     async def _get_or_create_cart(
-            self, field_relation: str, user_id: int, data_model: dict) -> int:
+            self, user_id: int, data_model: dict) -> int:
         """Create or get cart id"""
         payload = {
-            f'populate[{field_relation}][populate][0]': 'product',
+            'populate[quantity_products][populate][0]': 'product',
             'filters[id_tg][$eq]': user_id,
         }
         shop_cart_response = await self._session.get(
-            url='{api_url}{endpoints}'.format(
+            url='{api_url}carts'.format(
                 api_url=self._api_url,
-                endpoints=self._endpoints,
             ),
             headers=self._headers,
             params=payload)
         shop_cart = await shop_cart_response.json()
         if not shop_cart.get('data'):
             shop_cart_response = await self._session.post(
-                url='{api_url}{endpoints}'.format(
+                url='{api_url}carts'.format(
                     api_url=self._api_url,
-                    endpoints=self._endpoints),
+                ),
                 headers=self._headers,
                 json=data_model)
             shop_cart = await shop_cart_response.json()
@@ -274,20 +267,19 @@ class Strapi:
         return shop_cart.get('data')[0].get('id')
 
     async def _get_or_create_quantity_product(
-            self, shop_cart_id: int, name_relation: str,
-            field_relation: str,
+            self, shop_cart_id: int,
             data_model: dict,
             data_relation: dict,
             product_id: int) -> int:
         """Create or get quantity-product id"""
         payload = {
             'populate[product][populate][0]': 'id',
-            f'filters[{self._endpoint}][id][$eq]': shop_cart_id}
+            'filters[cart][id][$eq]': shop_cart_id}
 
         quantity_product_request = await self._session.get(
-            url='{api_url}{relation_endpoint}'.format(
+            url='{api_url}quantity-products'.format(
                 api_url=self._api_url,
-                relation_endpoint=name_relation),
+                ),
             headers=self._headers,
             params=payload)
 
@@ -305,9 +297,9 @@ class Strapi:
         if (not quantity_product_response.get('data')
                 or quantity_product_id == 0):
             quantity_product_request = await self._session.post(
-                url='{api_url}{relation_endpoints}'.format(
+                url='{api_url}quantity-products'.format(
                     api_url=self._api_url,
-                    relation_endpoints=name_relation),
+                    ),
                 headers=self._headers,
                 json=data_relation)
 
@@ -319,14 +311,13 @@ class Strapi:
 
             quantity_product_id = quantity_product.data.id
 
-            data_model.get('data')[field_relation] = {
+            data_model.get('data')['quantity_products'] = {
                 'connect': [quantity_product_id]
             }
 
             await self._session.put(
-                url='{api_url}{endpoints}/{cart_id}'.format(
+                url='{api_url}carts/{cart_id}'.format(
                     api_url=self._api_url,
-                    endpoints=self._endpoints,
                     cart_id=shop_cart_id),
                 headers=self._headers,
                 json=data_model)
@@ -334,12 +325,11 @@ class Strapi:
         return quantity_product_id
 
     async def _put_product_quantity(self, quantity_product_id: int,
-                                    name_relation: str, data_relation: dict):
+                                    data_relation: dict):
         """Update quantity-product model"""
         await self._session.put(
-            url='{api_url}{relation_endpoints}/{id}'.format(
+            url='{api_url}quantity-products/{id}'.format(
                 api_url=self._api_url,
-                relation_endpoints=name_relation,
                 id=quantity_product_id
             ),
             headers=self._headers,
