@@ -169,7 +169,7 @@ async def remove_product_shopping_cart(
                                    ),
                                    strapi=strapi,
                                    state=state)
-        # await shop_cart.close_session()
+
 
 
 @shop.callback_query(PayCallback.filter())

@@ -40,7 +40,6 @@ class Strapi(metaclass=BaseSingleton):
         """Exit session"""
         await self._session.close()
 
-
     async def get_product_all(self) -> ProductStrapiModelList:
         """Receives API request data, returns class StrapiModelList."""
 
@@ -122,10 +121,12 @@ class Strapi(metaclass=BaseSingleton):
         :param id_objects: id model
         :return: bytes
         """
+        url_by_photo = self._api_url.strip('api/')
         product_model = await self.get_product_by_id(id_objects)
         for product in product_model.data.attributes.picture.data:
             response = await self._session.get(
-                url='http://localhost:1337''{url}'.format(
+                url='{api_url}{url}'.format(
+                    api_url=url_by_photo,
                     url=product.attributes.formats.small.url
                 ),
                 headers=self._headers)
@@ -136,7 +137,7 @@ class Strapi(metaclass=BaseSingleton):
             self, product_id: int,
             user_id: int, data_model: dict,
             data_relation: dict,
-            ) -> None:
+    ) -> None:
         """
         creates a cart model with product-quantity models
 
@@ -155,8 +156,8 @@ class Strapi(metaclass=BaseSingleton):
         """
 
         cart_id = await self._get_or_create_cart(
-                                                 user_id=user_id,
-                                                 data_model=data_model)
+            user_id=user_id,
+            data_model=data_model)
 
         product_quantity_id = await self._get_or_create_quantity_product(
             shop_cart_id=cart_id,
@@ -279,7 +280,7 @@ class Strapi(metaclass=BaseSingleton):
         quantity_product_request = await self._session.get(
             url='{api_url}quantity-products'.format(
                 api_url=self._api_url,
-                ),
+            ),
             headers=self._headers,
             params=payload)
 
@@ -299,7 +300,7 @@ class Strapi(metaclass=BaseSingleton):
             quantity_product_request = await self._session.post(
                 url='{api_url}quantity-products'.format(
                     api_url=self._api_url,
-                    ),
+                ),
                 headers=self._headers,
                 json=data_relation)
 
